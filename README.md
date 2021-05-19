@@ -113,14 +113,14 @@ const bagOptions = {
 
   // decompression callbacks:
   // if your bag is compressed you can supply a callback to decompress it
-  // based on the compression type. The callback should accept a buffer of compressed bytes
-  // and return a buffer of uncompressed bytes.  For examples on how to decompress lz4 and bz2 compressed bags
+  // based on the compression type. The callback should accept a Uint8Array of compressed bytes
+  // and return a Uint8Array of uncompressed bytes. For examples on how to decompress lz4 and bz2 compressed bags
   // please see the tests here: https://github.com/cruise-automation/rosbag.js/blob/545529344c8c2a0b3a3126646d065043c2d67d84/src/bag.test.js#L167-L192
   // The decompression callback is also passed the uncompressedByteLength which is stored in the bag.
   // This byte length can be used with some decompression libraries to increase decompression efficiency.
   decompress?: {|
-    bz2?: (buffer: Buffer, uncompressedByteLength: number) => Buffer,
-    lz4?: (buffer: Buffer, uncompressedByteLength: number) => Buffer,
+    bz2?: (data: Uint8Array, uncompressedByteLength: number) => Uint8Array,
+    lz4?: (data: Uint8Array, uncompressedByteLength: number) => Uint8Array,
   |},
 
   // by default the individual parsed binary messages will be parsed based on their [ROS message definition](http://wiki.ros.org/msg)
@@ -160,9 +160,8 @@ const readResult {
   // a Time instance - the receive time of the message
   timestamp: Time
 
-  // the raw buffer data from the data record
-  // a node.js buffer in node & an array buffer in the browser
-  data: Array<int8>,
+  // the raw byte data from the data record
+  data: Uint8Array,
 
   // the offset of the chunk being read
   // starts at 0 and eventually increments to totalChunks

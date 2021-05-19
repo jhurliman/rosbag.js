@@ -156,7 +156,7 @@ describe("rosbag - high-level api", () => {
       // $FlowFixMe - adding invalid field
       frozenMsg.test = "test";
     }).toThrow();
-    // As far as I can tell, we can't make the Buffer / underlying ArrayBuffer immutable. :(
+    // As far as I can tell, we can't make the Uint8Array / underlying ArrayBuffer immutable. :(
   });
 
   it("reads messages filtered to a specific topic", async () => {
@@ -228,10 +228,7 @@ describe("rosbag - high-level api", () => {
       const messages = await fullyReadBag("example-bz2", {
         topics: ["/turtle1/color_sensor"],
         decompress: {
-          bz2: (buffer: Buffer) => {
-            const arr = compress.Bzip2.decompressFile(buffer);
-            return Buffer.from(arr);
-          },
+          bz2: (data: Uint8Array) => compress.Bzip2.decompressFile(data),
         },
       });
       const topics = messages.map((msg) => msg.topic);
@@ -243,7 +240,7 @@ describe("rosbag - high-level api", () => {
       const messages = await fullyReadBag("example-lz4", {
         topics: ["/turtle1/color_sensor"],
         decompress: {
-          lz4: (buffer: Buffer) => new Buffer(lz4.decompress(buffer)),
+          lz4: (data: Uint8Array) => lz4.decompress(data),
         },
       });
       const topics = messages.map((msg) => msg.topic);
@@ -257,11 +254,11 @@ describe("rosbag - high-level api", () => {
         endTime: { sec: 1396293887, nsec: 846735850 },
         topics: ["/turtle1/color_sensor"],
         decompress: {
-          lz4: (buffer: Buffer, size: number) => {
+          lz4: (data: Uint8Array, size: number) => {
             expect(size).toBe(743449);
-            const buff = new Buffer(lz4.decompress(buffer));
-            expect(buff.byteLength).toBe(size);
-            return buff;
+            const decompressed = lz4.decompress(data);
+            expect(decompressed.byteLength).toBe(size);
+            return decompressed;
           },
         },
       });

@@ -19,7 +19,7 @@ interface ChunkReadResult {
 }
 
 export type Decompress = {
-  [compression: string]: (buffer: Buffer, size: number) => Buffer,
+  [compression: string]: (data: Uint8Array, size: number) => Uint8Array,
 };
 
 const HEADER_READAHEAD = 4096;
@@ -40,16 +40,16 @@ export default class BagReader {
   }
 
   verifyBagHeader(callback: Callback<BagHeader>, next: () => void) {
-    this._file.read(0, HEADER_OFFSET, (error: Error | null, buffer?: Buffer) => {
-      if (error || !buffer) {
-        return callback(error || new Error("Missing both error and buffer"));
+    this._file.read(0, HEADER_OFFSET, (error: Error | null, data?: Uint8Array) => {
+      if (error || !data) {
+        return callback(error || new Error("Missing both error and data"));
       }
 
       if (this._file.size() < HEADER_OFFSET) {
         return callback(new Error("Missing file header."));
       }
 
-      if (buffer.toString() !== "#ROSBAG V2.0\n") {
+      if (new TextDecoder().decode(data) !== "#ROSBAG V2.0\n") {
         return callback(new Error("Cannot identify bag format."));
       }
       next();
@@ -61,25 +61,25 @@ export default class BagReader {
   // because you need the header information to call readConnectionsAndChunkInfo
   readHeader(callback: Callback<BagHeader>) {
     this.verifyBagHeader(callback, () => {
-      return this._file.read(HEADER_OFFSET, HEADER_READAHEAD, (error: Error | null, buffer?: Buffer) => {
-        if (error || !buffer) {
-          return callback(error || new Error("Missing both error and buffer"));
+      return this._file.read(HEADER_OFFSET, HEADER_READAHEAD, (error: Error | null, data?: Uint8Array) => {
+        if (error || !data) {
+          return callback(error || new Error("Missing both error and data"));
         }
 
-        const read = buffer.length;
+        const read = data.length;
         if (read < 8) {
           return callback(new Error(`Record at position ${HEADER_OFFSET} is truncated.`));
         }
 
-        const headerLength = buffer.readInt32LE(0);
+        const headerLength = new DataView(data.buffer).getInt32(0, true);
         if (read < headerLength + 8) {
           return callback(new Error(`Record at position ${HEADER_OFFSET} header too large: ${headerLength}.`));
         }
         try {
-          const header = this.readRecordFromBuffer(buffer, HEADER_OFFSET, BagHeader);
+          const header = this.readRecordFromBuffer(data, HEADER_OFFSET, BagHeader);
           return callback(null, header);
         } catch (e) {
-          return callback(new Error(`Could not read header from rosbag file buffer - ${e.message}`));
+          return callback(new Error(`Could not read header from rosbag file data - ${e.message}`));
         }
       });
     });
@@ -290,16 +290,14 @@ export default class BagReader {
     return records;
   }
 
-  // read an individual record from a buffer
-  readRecordFromBuffer<T: Record>(buffer: Buffer, fileOffset: number, cls: Class<T> & { opcode: number }): T {
-    const headerLength = buffer.readInt32LE(0);
-    const record = parseHeader(buffer.slice(4, 4 + headerLength), cls);
+  // read an individual record from a DataView
+  readRecordFromData<T: Record>(data: DataView, fileOffset: number, cls: Class<T> & { opcode: number }): T {
+    const headerLength = data.getInt32(0, true);
+    const record = parseHeader(new Uint8Array(data.buffer, 4, headerLength), cls);
 
     const dataOffset = 4 + headerLength + 4;
-    const dataLength = buffer.readInt32LE(4 + headerLength);
-    const data = buffer.slice(dataOffset, dataOffset + dataLength);
-
-    record.parseData(data);
+    const dataLength = data.getInt32(4 + headerLength, true);
+    record.parseData(new Uint8Array(data.buffer, dataOffset, dataLength));
 
     record.offset = fileOffset;
     record.dataOffset = record.offset + 4 + headerLength + 4;
